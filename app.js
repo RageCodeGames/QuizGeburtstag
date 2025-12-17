@@ -8,7 +8,7 @@
 // PASSWORT-SYSTEM
 // ==========================================
 
-const MASTER_PASSWORD = '1234'; // Passwort wird: DreamsInspireNatureAdventuresLiveSunshine
+const MASTER_PASSWORD = 'DreamsInspireNatureAdventuresLiveSunshine'; // Passwort wird: DreamsInspireNatureAdventuresLiveSunshine
 
 function checkPasswordUnlock() {
     const unlocked = localStorage.getItem('appUnlocked');
@@ -284,7 +284,8 @@ const state = new QuizState();
 // ==========================================
 
 function getCurrentDate() {
-    return '2026-04-25'; // TEST: Erste Frage
+    const now = new Date();
+    return now.toISOString().split('T')[0];
 }
 
 function isQuestionUnlocked(unlockDate) {
