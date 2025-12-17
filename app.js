@@ -4,11 +4,76 @@
 
 // FRAGEN-DATENBANK
 // Format: { unlockDate: 'YYYY-MM-DD', question: '', answer: '', caseSensitive: false }
+// ==========================================
+// PASSWORT-SYSTEM
+// ==========================================
+
+const MASTER_PASSWORD = '1234'; // Passwort wird: DreamsInspireNatureAdventuresLiveSunshine
+
+function checkPasswordUnlock() {
+    const unlocked = localStorage.getItem('appUnlocked');
+    return unlocked === 'true';
+}
+
+function unlockApp(password) {
+    if (password === MASTER_PASSWORD) {
+        localStorage.setItem('appUnlocked', 'true');
+        
+        // Passwort-Screen ausblenden
+        document.getElementById('passwordScreen').style.display = 'none';
+        document.getElementById('mainApp').style.display = 'block';
+        
+        // App normal starten
+        init();
+        
+        return true;
+    } else {
+        return false;
+    }
+}
+
+// Passwort Button Event
+document.addEventListener('DOMContentLoaded', function() {
+    const passwordBtn = document.getElementById('passwordBtn');
+    const passwordInput = document.getElementById('passwordInput');
+    const passwordError = document.getElementById('passwordError');
+    
+    // Check ob bereits entsperrt
+    if (checkPasswordUnlock()) {
+        document.getElementById('passwordScreen').style.display = 'none';
+        document.getElementById('mainApp').style.display = 'block';
+        init(); // App starten
+    }
+    
+    // Passwort prüfen
+    passwordBtn.addEventListener('click', function() {
+        const password = passwordInput.value.trim();
+        
+        if (unlockApp(password)) {
+            passwordError.textContent = '';
+        } else {
+            passwordError.textContent = '❌ Falsches Passwort!';
+            passwordInput.value = '';
+            passwordInput.style.animation = 'shake 0.5s';
+            setTimeout(() => {
+                passwordInput.style.animation = '';
+            }, 500);
+        }
+    });
+    
+    // Enter-Taste
+    passwordInput.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            passwordBtn.click();
+        }
+    });
+});
+
 const questions = [
     {
         id: 1,
         unlockDate: '2025-12-24', // Heiligabend - erste Frage
-        question: 'Wo versteckt sich dein Weihnachtsgeschenk? Tipp: Es ist im Hotelzimmer',
+        question: 'Wo war dein Weihnachtsgeschenk versteckt?',
         answer: 'Koffer',
         caseSensitive: false
     },
@@ -85,7 +150,7 @@ const questions = [
     {
         id: 12,
         unlockDate: '2026-03-08',
-        question: 'Was hast du zum Valentistag bekommen?',
+        question: 'Was hast du zum Valentinstag bekommen?',
         answer: 'Socken',
         caseSensitive: false
     },
@@ -145,7 +210,7 @@ const finalQuestion = {
 
 const ultimateFinalQuestion = {
     id: 20,
-    question: 'Wer hat heute Geburtstag? 🎂',
+    question: 'Wer feiert in 4 Tagen den 30. Geburtstag? 🎂',
     answer: 'Ruby', // <-- ÄNDERE DAS!
     caseSensitive: false
 };
@@ -219,8 +284,7 @@ const state = new QuizState();
 // ==========================================
 
 function getCurrentDate() {
-    const now = new Date();
-    return now.toISOString().split('T')[0]; // YYYY-MM-DD
+    return '2026-04-25'; // TEST: Erste Frage
 }
 
 function isQuestionUnlocked(unlockDate) {
@@ -299,14 +363,8 @@ function displayQuestion(question) {
     const quizSection = document.getElementById('quizSection');
     const lockedMessage = document.getElementById('lockedMessage');
     
-    if (!isQuestionUnlocked(question.unlockDate)) {
-        // Frage ist noch gesperrt
-        quizSection.querySelector('.question-card').style.display = 'none';
-        lockedMessage.style.display = 'block';
-        
-        document.getElementById('nextDate').textContent = formatDate(question.unlockDate);
-        startCountdown(question.unlockDate);
-    } else {
+    // Ultimate Final hat kein unlockDate - immer zeigen!
+    if (!question.unlockDate || isQuestionUnlocked(question.unlockDate)) {
         // Frage ist freigeschaltet
         quizSection.querySelector('.question-card').style.display = 'block';
         lockedMessage.style.display = 'none';
@@ -315,6 +373,13 @@ function displayQuestion(question) {
         document.getElementById('questionText').textContent = question.question;
         document.getElementById('answerInput').value = '';
         document.getElementById('message').style.display = 'none';
+    } else {
+        // Frage ist noch gesperrt
+        quizSection.querySelector('.question-card').style.display = 'none';
+        lockedMessage.style.display = 'block';
+        
+        document.getElementById('nextDate').textContent = formatDate(question.unlockDate);
+        startCountdown(question.unlockDate);
     }
 }
 
@@ -361,6 +426,9 @@ function checkAnswer() {
         state.markAnswered(question.id, userAnswer);
         updateProgressBar();
         
+        // *** NEU: Binary Display sofort updaten! ***
+        updateBinaryDisplay();
+        
         // Nächste Frage nach 3 Sekunden
         setTimeout(() => {
             checkCompletion();
@@ -369,6 +437,14 @@ function checkAnswer() {
     } else {
         showMessage('✗ Leider falsch. Versuch es nochmal!', 'error');
     }
+}
+
+function updateBinaryDisplay() {
+    const binaryDisplay = document.getElementById('binaryDisplay');
+    binaryDisplay.textContent = state.binaryData || 'Noch keine Daten gesammelt...';
+    
+    // Scroll nach unten im Binary Display
+    binaryDisplay.scrollTop = binaryDisplay.scrollHeight;
 }
 
 function checkCompletion() {
@@ -410,31 +486,72 @@ function showBinaryData() {
 async function showQRAnimation() {
     const quizSection = document.getElementById('quizSection');
     const binarySection = document.getElementById('binarySection');
+    const binaryDisplay = document.getElementById('binaryDisplay');
     const qrSection = document.getElementById('qrSection');
     
-    // Hide quiz & binary
+    // Hide quiz
     quizSection.style.display = 'none';
     
-    // Animate binary → QR
+    // Schritt 1: "Konvertiere..." anzeigen
     binarySection.querySelector('h3').textContent = '⚡ Konvertiere Daten...';
+    await sleep(1000);
     
+    // Schritt 2: Binärcode pulsieren lassen (3x)
+    for (let i = 0; i < 3; i++) {
+        binaryDisplay.style.transform = 'scale(1.1)';
+        binaryDisplay.style.transition = 'transform 0.3s';
+        await sleep(300);
+        binaryDisplay.style.transform = 'scale(1)';
+        await sleep(300);
+    }
+    
+    // Schritt 3: "Generiere QR-Code..."
+    binarySection.querySelector('h3').textContent = '📊 Generiere Reiseziel...';
+    binaryDisplay.textContent = '█▀▀█▀▀█▀▀█\n█ ▄▄▄▄▄ █\n█ █   █ █\n█ █▀▀▀█ █\n█▄▄▄▄▄▄▄█';
     await sleep(2000);
     
-    // Generate QR Code
-    const qrData = 'https://imgur.com/ONB00d9';
+    // Schritt 4: Binary ausblenden
+    binarySection.style.display = 'none';
+    
+    // Schritt 5: QR-Code generieren (erstmal unsichtbar)
+    const qrData = 'https://imgur.com/a/MFNGXtU';
+    
+    if (typeof QRCode === 'undefined') {
+        console.error('QRCode Library nicht geladen!');
+        qrSection.innerHTML = '<h2>❌ Fehler: QR-Code kann nicht generiert werden</h2>';
+        qrSection.style.display = 'block';
+        return;
+    }
+    
+    // QR-Code generieren
     generateQRCode(qrData);
     
-    // Hide binary, show QR
-    binarySection.style.display = 'none';
+    // Schritt 6: QR Section vorbereiten (unsichtbar)
+    qrSection.style.opacity = '0';
+    qrSection.style.transform = 'scale(0.5)';
     qrSection.style.display = 'block';
-    qrSection.scrollIntoView({ behavior: 'smooth' });
+    
+    await sleep(300);
+    
+    // Schritt 7: EPISCHE ANIMATION!
+    qrSection.style.transition = 'opacity 1s ease, transform 1s ease';
+    qrSection.style.opacity = '1';
+    qrSection.style.transform = 'scale(1)';
+    
+    // Scroll zu QR Section
+    await sleep(500);
+    qrSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 
-function generateQRCode(data) {
+ function generateQRCode(data) {
     const qrContainer = document.getElementById('qrCanvas');
-    qrContainer.innerHTML = ''; // Clear previous
+    qrContainer.innerHTML = '';
     
-    new QRCode(qrContainer, {
+    const qrDiv = document.createElement('div');
+    qrDiv.id = 'qrcode';
+    qrContainer.appendChild(qrDiv);
+    
+    new QRCode(qrDiv, {
         text: data,
         width: 256,
         height: 256,
@@ -442,6 +559,114 @@ function generateQRCode(data) {
         colorLight: '#ffffff',
         correctLevel: QRCode.CorrectLevel.H
     });
+    
+    // NEU: Nach 3 Sekunden Button anzeigen
+    setTimeout(() => {
+        document.getElementById('revealBtn').style.display = 'inline-block';
+    }, 60000);
+}
+
+// NEU: Auflösungs-Animation
+document.addEventListener('DOMContentLoaded', function() {
+    const revealBtn = document.getElementById('revealBtn');
+    
+    if (revealBtn) {
+        revealBtn.addEventListener('click', startRevealAnimation);
+    }
+});
+
+async function startRevealAnimation() {
+    const revealBtn = document.getElementById('revealBtn');
+    const revealAnimation = document.getElementById('revealAnimation');
+    const passwordReveal = document.getElementById('passwordReveal');
+    const finalWord = document.getElementById('finalWord');
+    
+    // Button ausblenden
+    revealBtn.style.display = 'none';
+    
+    // Animation Container anzeigen
+    revealAnimation.style.display = 'block';
+    revealAnimation.scrollIntoView({ behavior: 'smooth' });
+    
+    await sleep(1000);
+    
+    // ÄNDERE DAS PASSWORT HIER! (z.B. DreamsInspireNatureAdventuresLiveSunshine)
+    const password = 'DreamsInspireNatureAdventuresLiveSunshine';
+    const words = ['Dreams', 'Inspire', 'Nature', 'Adventures', 'Live', 'Sunshine'];
+    
+    // Schritt 1: Zeige alle Wörter
+    words.forEach(word => {
+        const wordSpan = document.createElement('div');
+        wordSpan.style.display = 'inline-block';
+        wordSpan.style.margin = '5px';
+        
+        for (let i = 0; i < word.length; i++) {
+            const letter = document.createElement('span');
+            letter.className = 'letter';
+            letter.textContent = word[i];
+            letter.style.animationDelay = `${i * 0.1}s`;
+            wordSpan.appendChild(letter);
+        }
+        
+        passwordReveal.appendChild(wordSpan);
+    });
+    
+    await sleep(3000);
+    
+    // Schritt 2: Markiere erste Buchstaben
+    const allLetters = passwordReveal.querySelectorAll('.letter');
+    let firstLetterIndices = [0]; // Erster Buchstabe von erstem Wort
+    let currentIndex = 0;
+    
+    words.forEach((word, wordIdx) => {
+        if (wordIdx > 0) {
+            currentIndex += words[wordIdx - 1].length;
+            firstLetterIndices.push(currentIndex);
+        }
+    });
+    
+    // Highlight erste Buchstaben
+    firstLetterIndices.forEach(idx => {
+        allLetters[idx].classList.add('first-letter');
+    });
+    
+    await sleep(2000);
+    
+    // Schritt 3: Blende andere Buchstaben aus
+    allLetters.forEach((letter, idx) => {
+        if (!firstLetterIndices.includes(idx)) {
+            setTimeout(() => {
+                letter.classList.add('fade-out');
+            }, idx * 20);
+        }
+    });
+    
+    await sleep(2000);
+    
+    // Schritt 4: Sammle erste Buchstaben
+    const firstLetters = firstLetterIndices.map(idx => allLetters[idx].textContent);
+    
+    // Clear und zeige nur erste Buchstaben
+    passwordReveal.innerHTML = '';
+    firstLetters.forEach((letter, idx) => {
+        const span = document.createElement('span');
+        span.className = 'letter first-letter rearrange';
+        span.textContent = letter;
+        span.style.animationDelay = `${idx * 0.2}s`;
+        passwordReveal.appendChild(span);
+    });
+    
+    await sleep(2000);
+    
+    // Schritt 5: Ordne zu ISLAND
+    passwordReveal.style.transition = 'all 1s ease';
+    passwordReveal.style.transform = 'scale(0)';
+    
+    await sleep(1000);
+    
+    // Schritt 6: ISLAND erscheint!
+    finalWord.textContent = 'ISLAND';
+    finalWord.classList.add('show');
 }
 
 function sleep(ms) {
@@ -475,9 +700,6 @@ function init() {
         showQRAnimation();
     }
 }
-
-// Start app
-init();
 
 // DEBUG: Uncomment für Testing
 // console.log('Current State:', state);
